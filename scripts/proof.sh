@@ -8,7 +8,7 @@
 # The copy lands in ${CLAUDE_SCRATCH:-/tmp}/jsmover-proof-<pid>/ with an overlay
 # of barrel re-exports, a runtime import() and a require(), is committed to a
 # fresh git repository, and is checked with scripts/resolve-check.mjs --jsdoc
-# before any move. Each move then runs through bin/jsmover.js, is checked again,
+# before any move, and is removed once every move passes. Each move then runs through bin/jsmover.js, is checked again,
 # and prints its `git diff --stat HEAD`. The last line is `proof: ok`, or
 # `proof: FAIL <move>` for the first move that left a miss or exited non-zero.
 
@@ -64,4 +64,5 @@ for move in "${MOVES[@]}"; do
 	[ "$moved" -eq 0 ] && [ "$checked" -eq 0 ] || fail "$label"
 done
 
+cd "$repo" && rm -r "$work"
 echo "proof: ok"
