@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Move a JavaScript file or directory and rewrite every relative import specifier the move breaks.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "jsmover": "bin/jsmover.js"
