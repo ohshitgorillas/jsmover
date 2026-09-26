@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make check *)",
+      "Bash(make test-js *)",
+      "Bash(make lint-js *)",
+      "Bash(scripts/gate.sh make check *)",
+      "Bash(scripts/gate.sh make test-js *)",
+      "Bash(scripts/gate.sh make lint-js *)",
+      "Bash(scripts/gate.sh npm test *)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(npx prettier *)",
+      "Bash(git add *)",
+      "Bash(git restore *)",
+      "Bash(git commit *)"
+    ]
+  },
+  "enabledPlugins": {
+    "filepawl@filepawl": true,
+    "triviajudge@triviajudge": true
+  }
+}

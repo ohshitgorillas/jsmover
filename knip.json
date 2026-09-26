@@ -1,0 +1,7 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["tests/**/*.test.js"],
+  "project": ["bin/**/*.js", "src/**/*.js", "tests/**/*.js", "eslint-rules/**/*.js"],
+  "ignoreDependencies": ["prettier", "jscpd"],
+  "exclude": ["unlisted", "binaries"]
+}

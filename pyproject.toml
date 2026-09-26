@@ -1,0 +1,11 @@
+[tool.filepawl]
+languages = ["javascript"]
+tests = ["tests/**"]
+
+[tool.filepawl.javascript]
+include = ["**/*.js", "**/*.mjs"]
+
+[tool.triviajudge]
+suffixes = [".js", ".mjs"]
+excluded = ["tests/"]
+cache_dir = ".triviajudge"

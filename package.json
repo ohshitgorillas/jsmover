@@ -1,0 +1,25 @@
+{
+  "name": "jsmover",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Move a JavaScript file or directory and rewrite every relative import specifier the move breaks.",
+  "type": "module",
+  "bin": {
+    "jsmover": "bin/jsmover.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-jsdoc": "^63.3.3",
+    "eslint-plugin-sonarjs": "^4.2.0",
+    "globals": "^16.5.0",
+    "jscpd": "^5.0.14",
+    "knip": "^5.66.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

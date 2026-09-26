@@ -1,0 +1,73 @@
+repos:
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: npx eslint
+        language: system
+        types: [javascript]
+      - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: system
+        files: \.(js|json)$
+        exclude: ^package(-lock)?\.json$
+      - id: tsc
+        name: tsc (checkJs, strict)
+        entry: npx tsc -p jsconfig.json --checkJs
+        language: system
+        pass_filenames: false
+        types: [javascript]
+      - id: knip
+        name: knip dead-export gate
+        entry: npx knip
+        language: system
+        pass_filenames: false
+        types: [javascript]
+
+      # A clone has two ends and either one can move, and the threshold is a
+      # whole-tree percentage, so the gate reads the source set from .jscpd.json
+      # rather than the staged filenames.
+      - id: jscpd
+        name: copy-paste duplication gate
+        entry: npx jscpd
+        language: system
+        pass_filenames: false
+        types: [javascript]
+
+      - id: test-js
+        name: node --test with coverage thresholds
+        entry: make test-js
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: filepawl
+        name: filepawl check
+        entry: .venv/bin/filepawl check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: md-trivia
+        name: markdown states what holds now (LLM judge)
+        entry: .venv/bin/triviajudge-md
+        language: system
+        files: \.md$
+      - id: changelog-trivia
+        name: changelog entries are new work, not repeats (LLM judge)
+        entry: .venv/bin/triviajudge-changelog
+        language: system
+        files: ^CHANGELOG\.md$
+      - id: archaeology
+        name: decision-archaeology gate
+        entry: .venv/bin/triviajudge-archaeology
+        language: system
+        files: \.(js|mjs)$
+        exclude: ^tests/
+      - id: comment-trivia
+        name: comments state what holds now (LLM judge)
+        entry: .venv/bin/triviajudge-comments
+        language: system
+        files: \.(js|mjs)$
+        exclude: ^tests/

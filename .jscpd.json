@@ -1,0 +1,9 @@
+{
+  "path": ["bin", "src", "tests", "eslint-rules", "scripts"],
+  "format": ["javascript"],
+  "ignore": ["**/node_modules/**"],
+  "minTokens": 50,
+  "threshold": 2.3,
+  "reporters": ["console"],
+  "absolute": true
+}
