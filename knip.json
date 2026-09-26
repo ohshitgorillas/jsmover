@@ -3,5 +3,6 @@
   "entry": ["tests/**/*.test.js"],
   "project": ["bin/**/*.js", "src/**/*.js", "tests/**/*.js", "eslint-rules/**/*.js"],
   "ignoreDependencies": ["prettier", "jscpd"],
+  "ignore": ["tests/corpus/**"],
   "exclude": ["unlisted", "binaries"]
 }

@@ -11,7 +11,7 @@ repos:
         entry: npx prettier --write
         language: system
         files: \.(js|json)$
-        exclude: ^package(-lock)?\.json$
+        exclude: ^(package(-lock)?\.json|tests/corpus/.*)$
       - id: tsc
         name: tsc (checkJs, strict)
         entry: npx tsc -p jsconfig.json --checkJs

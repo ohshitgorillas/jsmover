@@ -1,0 +1,150 @@
+// Easy Mode's VIEW state: whether the Easy Mode card is on screen instead of the
+// filter cards. Nothing here touches a field or the daemon — a tile click is an
+// ordinary staged edit, and this module only decides what the user is looking at
+// while they make it.
+//
+// That fact belongs to the BROWSER, not to a preset: which face of the filter
+// controls someone prefers is a property of the person, not of the configuration
+// they are editing. That is the difference from store/matrix/mode.js, whose
+// speakers/headphones choice is stored per preset on the server and only falls
+// back to localStorage. Here localStorage is the whole store.
+//
+// Module load stays node-safe (the SSR harness imports the component graph with
+// no localStorage), so every read and write is guarded and a dead store simply
+// leaves the in-memory signal driving the session.
+import { signal } from "@preact/signals";
+
+const K_MODE = "hqptuner.easyMode";
+const K_KNOBS = "hqptuner.easyKnobs";
+const K_MATERIAL = "hqptuner.easyMaterial";
+
+/**
+ * @param {string} key
+ * @returns {string | null}
+ */
+function read(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null; // storage disabled — the default stands for this session
+  }
+}
+
+/**
+ * @param {string} key
+ * @param {string} value
+ * @returns {void}
+ */
+function write(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* storage disabled — the in-memory value drives the session */
+  }
+}
+
+/** Whether the Easy Mode card is showing in place of the filter cards. */
+export const easyMode = signal(read(K_MODE) === "1");
+
+// The one thing in this module that is NOT remembered. Which face of the
+// controls someone prefers is a property of the person; having once read the
+// help is not, and a panel that reopened itself on every load would be a page
+// element rather than an answer to a question.
+/** Whether the help panel is open under the Easy Mode card. */
+export const easyHelp = signal(false);
+
+/**
+ * Open the help panel, or close it if it is already open.
+ * @returns {void}
+ */
+export function toggleEasyHelp() {
+  easyHelp.value = !easyHelp.value;
+}
+
+/**
+ * Show or hide the Easy Mode card, and remember which for next time.
+ * @param {boolean} on
+ * @returns {void}
+ */
+export function setEasyMode(on) {
+  easyMode.value = !!on;
+  write(K_MODE, easyMode.value ? "1" : "0");
+}
+
+// The card's one knob: what material is playing. A fact about the source, not
+// about a preset, so it is held once here rather than per tile, and remembered
+// the way the mode is — the same person plays the same library next time.
+// Nothing here is written to a field: moving it changes what the tiles name and
+// what a press writes, and the press is still the write.
+/** The card's material position: "lossless" (default) or "lossy". */
+export const easyMaterial = signal(read(K_MATERIAL) || "lossless");
+
+/**
+ * Set the card's material position, and remember it for next time.
+ * @param {string} value
+ * @returns {void}
+ */
+export function setEasyMaterial(value) {
+  easyMaterial.value = value;
+  write(K_MATERIAL, value);
+}
+
+// Where each preset's knobs were left. A tile's knob positions are otherwise
+// readable only while that tile is the lit one, because they are derived from
+// the filter values every render — press a different tile and the one you left
+// matches nothing, so it has nothing to show and falls back to its defaults.
+// That loses a position the user set, which is what this remembers.
+//
+// Only DARK tiles read it. The lit tile still shows what the fields carry, so a
+// filter changed by hand in a chain card still wins over anything stored here.
+/**
+ * Parse the stored record, discarding anything that is not a map of maps of
+ * strings — a hand-edited or half-written entry leaves the store empty rather
+ * than seeding a tile with a position no knob has.
+ *
+ * @returns {Record<string, Record<string, string>>}
+ */
+function readKnobs() {
+  /** @type {Record<string, Record<string, string>>} */
+  const out = {};
+  let raw;
+  try {
+    raw = JSON.parse(read(K_KNOBS) || "");
+  } catch {
+    return out; // nothing stored, or not JSON — every tile starts at its defaults
+  }
+  if (raw === null || typeof raw !== "object") return out;
+  for (const [presetId, positions] of Object.entries(raw)) {
+    if (positions === null || typeof positions !== "object") continue;
+    /** @type {Record<string, string>} */
+    const kept = {};
+    for (const [knob, at] of Object.entries(positions)) if (typeof at === "string") kept[knob] = at;
+    out[presetId] = kept;
+  }
+  return out;
+}
+
+/** Where each preset's knobs were last set, by preset id. */
+export const easyKnobs = signal(readKnobs());
+
+/**
+ * Remember where a preset's knobs were set, so its tile shows them again once it goes dark.
+ *
+ * @param {string} presetId
+ * @param {Record<string, string>} knobs
+ * @returns {void}
+ */
+export function rememberKnobs(presetId, knobs) {
+  easyKnobs.value = { ...easyKnobs.value, [presetId]: { ...knobs } };
+  write(K_KNOBS, JSON.stringify(easyKnobs.value));
+}
+
+/**
+ * Where a preset's knobs were last set — empty when it has never been set.
+ *
+ * @param {string} presetId
+ * @returns {Record<string, string>}
+ */
+export function knobsFor(presetId) {
+  return easyKnobs.value[presetId] || {};
+}

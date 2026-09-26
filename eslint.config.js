@@ -85,7 +85,7 @@ const NODE = { ecmaVersion: 2022, sourceType: "module", globals: globals.node };
 
 export default [
   {
-    ignores: ["node_modules/**", ".venv/**", "coverage/**", ".triviajudge/**"],
+    ignores: ["node_modules/**", ".venv/**", "coverage/**", ".triviajudge/**", "tests/corpus/**"],
   },
   js.configs.recommended,
   {

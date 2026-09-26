@@ -60,7 +60,7 @@ Each requirement is a rule that holds for every run, followed by the test that p
 
 **R2. The moved file's own outward specifiers are rewritten.** A relative specifier inside the moved file that points at a file outside the move is recomputed from the file's new location. Test: `tests/plan.test.js` moves a file one directory deeper and asserts its `"./dom.js"` import becomes `"../dom.js"`. Excludes: a moved file whose own imports resolve against its old directory.
 
-**R3. A directory move takes every file beneath it and keeps its internal specifiers as written.** Every file under the moved directory moves with it. A specifier between two moved files is byte-identical after the move. Specifiers crossing the boundary are rewritten in both directions: from outside into the directory (`components/binder.js` importing `"./narrowbar/facettip.js"` becomes `"./narrow/facettip.js"` when `components/narrowbar` moves to `components/narrow`), and from inside to outside. A specifier written as `dir/index.js` keeps that form. A rewrite never adds a `../` segment beyond what the new relative path needs. Test: `tests/plan.test.js` moves a directory holding two files that import each other and one outside importer, and asserts the internal specifier is unchanged while the outside one follows the move. Excludes: a directory move that rewrites, re-extensions or re-roots imports between files that moved together.
+**R3. A directory move takes every file beneath it and keeps its internal specifiers as written.** Every file under the moved directory moves with it. A specifier between two moved files is byte-identical after the move. Specifiers crossing the boundary are rewritten in both directions: from outside into the directory (`components/binder.js` importing `"./narrowbar/facettip.js"` becomes `"./narrow/facettip.js"` when `components/narrowbar` moves to `components/narrow`), and from inside to outside. A specifier written as `dir/index.js` keeps that form, and a bare directory specifier (`./dir`) resolving through `index.js` keeps that form while the index stays in a directory the specifier can name, and becomes an explicit file path otherwise. A rewrite never adds a `../` segment beyond what the new relative path needs. Test: `tests/plan.test.js` moves a directory holding two files that import each other and one outside importer, and asserts the internal specifier is unchanged while the outside one follows the move. Excludes: a directory move that rewrites, re-extensions or re-roots imports between files that moved together.
 
 **R4. Nothing but affected specifier text changes.** The only bytes that differ after a move are the contents of the specifiers the move breaks. Quote style stays as written, import order stays as written, no whitespace or formatting changes, and no alias replaces a relative path (`"./lib/dom.js"` never becomes `"@/lib/dom.js"`). A vendor or minified file changes only at an affected specifier. Test: `tests/apply.test.js` moves a file in a fixture tree whose files mix quote styles, unsorted imports and irregular spacing, and asserts every other file is byte-identical and the importer differs from its original on the specifier's line only. Excludes: a move that produces a diff across the whole tree for a one-file change.
 
@@ -78,11 +78,11 @@ Each requirement is a rule that holds for every run, followed by the test that p
 
 **R11. Bare, absolute and `node:` specifiers are untouched.** A specifier that does not start with `./` or `../` is never resolved and never rewritten, even when its text contains the moved path. Test: `tests/plan.test.js` places `"preact"`, `"/lib/coerce.js"` and `"node:path"` beside a relative import of the moved file and asserts only the relative one changes. Excludes: a rewrite of a package import that happens to share a name with the moved file.
 
-**R12. The move itself is guarded and uses git inside a work tree.** The destination's parent directory is created when missing. An existing destination refuses the move before any change, with exit 1. When `git rev-parse --is-inside-work-tree` succeeds, the move is a `git mv`, and a `git mv` failure surfaces git's own error text and exit status; outside a work tree the move is a plain rename. Test: `tests/cli.test.js` asserts exit 1 and an unchanged tree for an existing destination, and `tests/git.test.js` asserts a staged rename inside a fixture repository. Excludes: an overwritten destination, and a moved file that git records as a delete plus an untracked file.
+**R12. The move itself is guarded and uses git inside a work tree.** The destination's parent directory is created when missing. An existing destination refuses the move before any change, with exit 1. When `git rev-parse --is-inside-work-tree` succeeds and `git ls-files --error-unmatch <old>` reports the source tracked, the move is a `git mv`, and a `git mv` failure surfaces git's own error text and exit status; outside a work tree, or for an untracked source, the move is a plain rename. Test: `tests/cli.test.js` asserts exit 1 and an unchanged tree for an existing destination, and `tests/git.test.js` asserts a staged rename inside a fixture repository. Excludes: an overwritten destination, and a moved file that git records as a delete plus an untracked file.
 
 **R13. Exit codes are fixed.** Exit 0 means the move and every rewrite applied. Exit 1 means the move was refused or failed, and nothing in the tree changed. Exit 2 means a usage error. Test: `tests/cli.test.js` asserts one run for each status. Excludes: a script caller that cannot tell a refused move from a completed one.
 
-**R14. Stale literals are reported, never edited.** After the move, every string literal or comment text outside a rewritten site whose text equals the old path or the old basename is printed as `path:line: text`. These lines are advisory and none of them is edited. Test: `tests/report.test.js` asserts a string literal holding the old basename is listed with its path and line, and `tests/apply.test.js` asserts that file is byte-identical. Excludes: a hard-coded path in a lookup table or a log message that goes stale with no mention.
+**R14. Stale literals are reported, never edited.** After the move, every string literal or comment text outside a rewritten site that contains the old root-relative path, or a `./`/`../` path that resolves from its file to the old location, is printed as `path:line: text`. These lines are advisory and none of them is edited. Test: `tests/report.test.js` asserts a string literal holding the old root-relative path is listed with its path and line, and `tests/apply.test.js` asserts that file is byte-identical. Excludes: a hard-coded path in a lookup table or a log message that goes stale with no mention.
 
 **R15. Resolution is exact first, then Node probing, and ambiguity aborts.** A specifier resolves to the file it names exactly when that file exists. Failing that, resolution probes, in order, `.js`, `.mjs`, `.cjs`, `.json`, `/index.js` and `/index.mjs`. An extensionless specifier that matches more than one candidate aborts the run with exit 1, listing the candidates. Test: `tests/resolve.test.js` asserts exact match over a probed candidate, and asserts the abort lists both `x.js` and `x.mjs` for a specifier `./x` that matches both. Excludes: a rewrite that picks one of two files at random.
 
@@ -110,6 +110,17 @@ Each module holds one concern.
 
 `plan.js` and `specifier.js` take plain data and return plain data: paths, texts and offsets in, moves and splices out. Everything that reads or writes the filesystem or spawns a process lives outside them.
 
+## 5a. Data contract
+
+Modules exchange plain objects with no methods and no class instances. Every path in them is relative to the root of the tree being edited.
+
+- A `Site` is `{ file, start, end, text, line, kind }`. `file` is the root-relative path of the file holding the specifier. `start` and `end` are the offsets of the literal's contents between its quotes, so the quotes themselves lie outside the range. `text` is that content. `line` is the line the literal starts on. `kind` is one of `import`, `export`, `dynamic`, `require` or `jsdoc`.
+- A `Move` is `{ from, to }`, both root-relative.
+- A `Rewrite` is a `Site` with one more field, `replacement`: the text that takes the place of `text` between `start` and `end`.
+- A `Plan` is `{ moves, rewrites, unresolvable }`, where `moves` is a `Move[]`, `rewrites` is a `Rewrite[]` and `unresolvable` is a `Site[]`.
+
+`resolve(site, files)` takes a `Site` and the root-relative paths of the tree's files. It returns the root-relative path the specifier names, or `null` when no file matches. When more than one file matches, it throws an `AmbiguousSpecifier` that carries the candidate paths.
+
 ## 6. Testing
 
 Tests live in `tests/*.test.js` and follow `docs/testing.md`.
@@ -121,14 +132,18 @@ Tests live in `tests/*.test.js` and follow `docs/testing.md`.
 
 ## 7. Corpus and proof
 
-The proof corpus is the hqptuner JavaScript tree at `~/dev/hqptuner/hqptuner/static`. It stays outside this repository. A committed copy would put 169 files of foreign code under every gate, and passing them would need a skip-list path in each gate's configuration, which is an exemption.
+The proof corpus lives at `tests/corpus/` inside this repository. It is a copy of the hqptuner front-end tree at `~/dev/hqptuner/hqptuner/static`, holding its 169 JavaScript files and its `index.html` in their original directory layout, with the stylesheets and fonts left out.
 
-`scripts/proof.sh <corpus>` copies the corpus into the scratch directory and runs the proof moves on the copy. The corpus holds no barrel re-exports, no runtime `import()` and no `require()`, so `scripts/proof.sh` lays a small overlay of files exercising those forms onto the copy before the moves run.
+The corpus is foreign code and sits outside every gate's scope. These scopes are owner-approved exemptions, and they are the only gate settings that name the corpus:
+
+- `eslint.config.js`: `ignores` lists `tests/corpus/**`.
+- `Makefile`: the prettier globs name `tests/*.test.js`, never `tests/**/*.js`.
+- `jsconfig.json`: `exclude` lists `tests/corpus`.
+- `knip.json`: `ignore` lists `tests/corpus/**`.
+- `.jscpd.json`: `ignore` lists `tests/corpus/**`.
+- `.pre-commit-config.yaml`: the `prettier` hook's `exclude` is `^(package(-lock)?\.json|tests/corpus/.*)$`.
+- `pyproject.toml`: `[tool.filepawl.javascript]` `include` lists only `bin/**/*.js`, `src/**/*.js`, `scripts/**/*.js`, `scripts/**/*.mjs`, `tests/*.js` and `tests/support/**/*.js`.
+
+`scripts/proof.sh` copies `tests/corpus/` into the scratch directory before the moves and runs the proof moves on the copy, so the committed corpus is never edited. The corpus holds no barrel re-exports, no runtime `import()` and no `require()`, so `scripts/proof.sh` lays a small overlay of files exercising those forms onto the copy before the moves run.
 
 `scripts/resolve-check.mjs` is the oracle. It carries its own lexer and imports nothing from `src/`, so a defect in jsmover's parser cannot hide itself. It checks that every relative specifier in the tree, including JSDoc `import()` references, resolves to an existing file. `scripts/proof.sh` runs it before and after each move, and reports the count of changed lines between the moved tree and the untouched copy alongside it.
-
-## 8. Open questions for the owner
-
-- Does JSDoc `import()` type rewriting (R10) stay in scope, given that it edits comment text?
-- Does the corpus stay outside the repository, with `scripts/proof.sh` taking its path as an argument?
-- The corpus holds 169 JavaScript files where the proof plan calls for about 1,250. Is 169 enough, or does a larger tree join it?

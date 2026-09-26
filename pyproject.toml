@@ -3,7 +3,7 @@ languages = ["javascript"]
 tests = ["tests/**"]
 
 [tool.filepawl.javascript]
-include = ["**/*.js", "**/*.mjs"]
+include = ["bin/**/*.js", "src/**/*.js", "scripts/**/*.js", "scripts/**/*.mjs", "tests/*.js", "tests/support/**/*.js"]
 
 [tool.triviajudge]
 suffixes = [".js", ".mjs"]
