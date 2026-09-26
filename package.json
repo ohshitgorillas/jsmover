@@ -1,6 +1,6 @@
 {
   "name": "jsmover",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Move a JavaScript file or directory and rewrite every relative import specifier the move breaks.",
   "license": "MIT",
