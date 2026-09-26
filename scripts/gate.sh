@@ -24,7 +24,7 @@ set -uo pipefail
 #: lines that decide a failing run, in the spellings the gates here use:
 #: make's own error line, pytest's FAILED and its summary count, a ruff or
 #: cargo-style diagnostic code, and a bare ERROR at the head of a line
-FAILURE='make: \*\*\*|FAILED|[0-9]+ failed|error\[|^ERROR'
+FAILURE='make: \*\*\*|FAILED|[0-9]+ failed|error\[|^ERROR|not ok|# fail [1-9]'
 
 #: how many matched lines are worth reading before the log itself is
 MATCH_LINES=40

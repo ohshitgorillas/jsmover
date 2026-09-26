@@ -8,7 +8,7 @@ lint:
 
 lint-js:
 	npx eslint .
-	npx prettier --check "bin/**/*.js" "src/**/*.js" "tests/*.test.js" "eslint-rules/*.js" eslint.config.js jsconfig.json knip.json .jscpd.json
+	npx prettier --check "bin/**/*.js" "src/**/*.js" "tests/*.test.js" "eslint-rules/*.js" "scripts/**/*.mjs" eslint.config.js jsconfig.json knip.json .jscpd.json
 	npx tsc -p jsconfig.json --checkJs
 	npx knip
 	npx jscpd
