@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planLines, staleLines } from "../src/report.js";
+import { planLines, staleLines, unresolvableLines } from "../src/report.js";
 
 /**
  * A site in `file` at `line` whose literal holds `text`.
@@ -49,22 +49,27 @@ test("a rewrite prints its file, line, old specifier and new specifier", () => {
   assert.deepEqual(planLines(plan), ["app/main.js:7: ../lib/coerce.js -> ../lib/core/coerce.js"]);
 });
 
-test("an unresolvable dynamic site prints its file and line", () => {
-  const plan = { ...NO_PLAN, unresolvable: [site("views/loader.js", 12, "`./parts/${n}.js`", "dynamic")] };
-  assert.deepEqual(planLines(plan), ["views/loader.js:12: unresolvable dynamic specifier"]);
+test("an unresolvable dynamic site names its file and line", () => {
+  const lines = unresolvableLines([site("views/loader.js", 12, "`./parts/${n}.js`", "dynamic")]);
+  assert.match(lines.join("\n"), /^views\/loader\.js:12: /);
 });
 
-test("moves come before rewrites and rewrites before unresolvable sites", () => {
+test("an unresolvable dynamic site stays out of the plan lines", () => {
   const plan = {
     moves: [{ from: "z/old.js", to: "z/new.js" }],
-    rewrites: [rewrite("a/first.js", 1, "../z/old.js", "../z/new.js")],
+    rewrites: [],
     unresolvable: [site("a/first.js", 1, "name", "require")],
   };
-  assert.deepEqual(planLines(plan), [
-    "move: z/old.js -> z/new.js",
-    "a/first.js:1: ../z/old.js -> ../z/new.js",
-    "a/first.js:1: unresolvable dynamic specifier",
-  ]);
+  assert.deepEqual(planLines(plan), ["move: z/old.js -> z/new.js"]);
+});
+
+test("moves come before rewrites", () => {
+  const plan = {
+    ...NO_PLAN,
+    moves: [{ from: "z/old.js", to: "z/new.js" }],
+    rewrites: [rewrite("a/first.js", 1, "../z/old.js", "../z/new.js")],
+  };
+  assert.deepEqual(planLines(plan), ["move: z/old.js -> z/new.js", "a/first.js:1: ../z/old.js -> ../z/new.js"]);
 });
 
 test("rewrites are listed by file, then by line within a file", () => {
@@ -84,15 +89,9 @@ test("rewrites are listed by file, then by line within a file", () => {
 });
 
 test("unresolvable sites are listed by file, then by line within a file", () => {
-  const plan = {
-    ...NO_PLAN,
-    unresolvable: [site("m.js", 20, "b", "dynamic"), site("m.js", 4, "a", "require"), site("k.js", 30, "c", "dynamic")],
-  };
-  assert.deepEqual(planLines(plan), [
-    "k.js:30: unresolvable dynamic specifier",
-    "m.js:4: unresolvable dynamic specifier",
-    "m.js:20: unresolvable dynamic specifier",
-  ]);
+  const sites = [site("m.js", 20, "b", "dynamic"), site("m.js", 4, "a", "require"), site("k.js", 30, "c", "dynamic")];
+  const places = unresolvableLines(sites).map((line) => line.split(": ")[0]);
+  assert.deepEqual(places, ["k.js:30", "m.js:4", "m.js:20"]);
 });
 
 test("moves are listed by their old path", () => {

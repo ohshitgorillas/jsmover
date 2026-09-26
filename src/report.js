@@ -40,9 +40,9 @@ export function unresolvableLines(sites) {
 }
 
 /**
- * Return the dry-run lines for a plan: one per file move, then one per
- * rewrite, then one per unresolvable site, each group ordered by file then line.
- * @param {Pick<import("./plan.js").Plan, "moves" | "rewrites" | "unresolvable">} plan the file moves, rewrites and unresolvable sites of a run
+ * Return the plan lines: one per file move, ordered by old path, then one per
+ * rewrite, ordered by file then line.
+ * @param {Pick<import("./plan.js").Plan, "moves" | "rewrites">} plan the file moves and rewrites of a run
  * @returns {string[]} the plan's lines, in print order
  */
 export function planLines(plan) {
@@ -51,7 +51,6 @@ export function planLines(plan) {
   return [
     ...moves.map((move) => `move: ${move.from} -> ${move.to}`),
     ...rewrites.map((site) => `${site.file}:${site.line}: ${site.text} -> ${site.replacement}`),
-    ...unresolvableLines(plan.unresolvable),
   ];
 }
 
