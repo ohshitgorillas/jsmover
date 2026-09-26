@@ -1,12 +1,6 @@
 import { posix } from "node:path";
 import { resolve } from "./resolve.js";
 
-/** @typedef {import("./jsdoc.js").Site} Site */
-/** @typedef {{ from: string, to: string }} Move */
-/** @typedef {Site & { replacement: string }} Rewrite */
-/** @typedef {{ moves: Move[], rewrites: Rewrite[], unresolvable: Site[] }} Plan */
-/** @typedef {{ file: string, start: number, end: number, text: string, line: number }} Text */
-
 // A `./` or `../` path standing at the start of a path token, running to the
 // next character that cannot sit inside a path.
 const RELATIVE = /(?<![\w./-])\.\.?\/[^\s"'`()<>{}[\],;]*/g;
@@ -37,19 +31,27 @@ function byFileThenLine(a, b) {
 }
 
 /**
- * Return the dry-run lines for a plan: one per move, then one per rewrite,
- * then one per unresolvable site, each group ordered by file then line.
- * @param {Plan} plan the moves, rewrites and unresolvable sites of a run
+ * Return one line per unresolvable site, ordered by file then line.
+ * @param {import("./parse.js").Site[]} sites the unresolvable sites
+ * @returns {string[]} one `file:line:` line per site
+ */
+export function unresolvableLines(sites) {
+  return sites.toSorted(byFileThenLine).map((site) => `${site.file}:${site.line}: unresolvable dynamic specifier`);
+}
+
+/**
+ * Return the dry-run lines for a plan: one per file move, then one per
+ * rewrite, then one per unresolvable site, each group ordered by file then line.
+ * @param {Pick<import("./plan.js").Plan, "moves" | "rewrites" | "unresolvable">} plan the file moves, rewrites and unresolvable sites of a run
  * @returns {string[]} the plan's lines, in print order
  */
 export function planLines(plan) {
   const moves = plan.moves.toSorted((a, b) => compare(a.from, b.from));
   const rewrites = plan.rewrites.toSorted(byFileThenLine);
-  const unresolvable = plan.unresolvable.toSorted(byFileThenLine);
   return [
     ...moves.map((move) => `move: ${move.from} -> ${move.to}`),
     ...rewrites.map((site) => `${site.file}:${site.line}: ${site.text} -> ${site.replacement}`),
-    ...unresolvable.map((site) => `${site.file}:${site.line}: unresolvable dynamic specifier`),
+    ...unresolvableLines(plan.unresolvable),
   ];
 }
 
@@ -67,39 +69,38 @@ function mentions(text, path) {
 }
 
 /**
- * Whether a relative path written in `file` names `from` or a file beneath it.
- * @param {string} file root-relative path of the file holding the text
+ * Whether a relative path written in `record`'s file names `from` or a file beneath it.
+ * @param {import("./parse.js").Text} record the string literal or comment holding the path
  * @param {string} relative a `./` or `../` path
  * @param {string} from the moved path's old location
  * @returns {boolean}
  */
-function reaches(file, relative, from) {
+function reaches(record, relative, from) {
   let path = relative;
   while (path.endsWith(".")) path = path.slice(0, -1);
-  const target = posix.join(posix.dirname(file), path);
+  const target = posix.join(posix.dirname(record.file), path);
   if (target.startsWith(`${from}/`)) return true;
-  const site = { file, start: 0, end: path.length, text: path, line: 0, kind: "string" };
-  return resolve(site, new Set([from])) === from;
+  return resolve({ ...record, text: path }, new Set([from])) === from;
 }
 
 /**
  * Whether a string literal or comment still points at the move's old location.
- * @param {Move} move
- * @param {Text} record
+ * @param {import("./plan.js").Move} move
+ * @param {import("./parse.js").Text} record
  * @returns {boolean}
  */
 function isStale(move, record) {
   if (mentions(record.text, move.from)) return true;
-  return [...record.text.matchAll(RELATIVE)].some(([relative]) => reaches(record.file, relative, move.from));
+  return [...record.text.matchAll(RELATIVE)].some(([relative]) => reaches(record, relative, move.from));
 }
 
 /**
  * Return the advisory lines for string literals and comments that still name
  * the move's old location, either by its root-relative path or by a `./` or
  * `../` path that resolves from their own file to it, ordered by file then line.
- * @param {Move} move the move whose old location is searched for
- * @param {Text[]} strings string literals that are not rewrite sites
- * @param {Text[]} comments comments, each with its body as `text`
+ * @param {import("./plan.js").Move} move the move whose old location is searched for
+ * @param {import("./parse.js").Text[]} strings string literals that are not rewrite sites
+ * @param {import("./parse.js").Text[]} comments comments, each with its body as `text`
  * @returns {string[]} one `file:line: text` line per stale record
  */
 export function staleLines(move, strings, comments) {

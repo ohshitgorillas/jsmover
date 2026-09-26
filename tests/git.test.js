@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gitMove, isTracked } from "../src/git.js";
+import { fixture, thrown } from "./support/fixture.js";
 
 const { GIT_DIR: _dir, GIT_WORK_TREE: _tree, GIT_INDEX_FILE: _index, ...inherited } = process.env;
 const GIT_ENV = {
@@ -27,47 +27,18 @@ function git(cwd, args) {
 }
 
 /**
- * A fresh directory holding `files`, removed when the test ends.
- * @param {import("node:test").TestContext} t
- * @param {Record<string, string>} files
- */
-function tree(t, files) {
-  const root = mkdtempSync(join(tmpdir(), "jsmover-git-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const [path, text] of Object.entries(files)) {
-    mkdirSync(dirname(join(root, path)), { recursive: true });
-    writeFileSync(join(root, path), text);
-  }
-  return root;
-}
-
-/**
  * A repository with `committed` in its first commit and `loose` left untracked.
  * @param {import("node:test").TestContext} t
  * @param {Record<string, string>} committed
  * @param {Record<string, string>} loose
  */
 function repo(t, committed, loose) {
-  const root = tree(t, committed);
+  const root = fixture(t, committed);
   git(root, ["init", "-q"]);
   git(root, ["add", "-A"]);
   git(root, ["commit", "-q", "-m", "fixture"]);
   for (const [path, text] of Object.entries(loose)) writeFileSync(join(root, path), text);
   return root;
-}
-
-/**
- * The error `fn` throws, or undefined when it returns.
- * @param {() => unknown} fn
- * @returns {unknown}
- */
-function thrown(fn) {
-  try {
-    fn();
-  } catch (error) {
-    return error;
-  }
-  return undefined;
 }
 
 test("a committed file reads as tracked", (t) => {
@@ -82,7 +53,7 @@ test("an untracked file reads differently from a committed one in the same repos
 
 test("a file outside any work tree reads differently from the same file committed", (t) => {
   const files = { "a.js": "export const a = 1;\n" };
-  const plain = tree(t, files);
+  const plain = fixture(t, files);
   const root = repo(t, files, {});
   assert.notEqual(isTracked(plain, "a.js"), isTracked(root, "a.js"));
 });

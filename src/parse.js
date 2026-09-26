@@ -1,11 +1,18 @@
 import { parse as acornParse } from "acorn";
 import { jsdocSites } from "./jsdoc.js";
 
-/** @typedef {import("./jsdoc.js").Site} Site */
+/**
+ * A span of a file's text: `start` and `end` are offsets into the file, `text`
+ * is what lies between them and `line` is the line it starts on.
+ * @typedef {{ file: string, start: number, end: number, text: string, line: number }} Text
+ */
+/**
+ * A specifier's contents between its quotes, with the form that holds it.
+ * @typedef {Text & { kind: string }} Site
+ */
 /** @typedef {import("acorn").AnyNode} AnyNode */
 /** @typedef {import("acorn").Comment} Comment */
 /** @typedef {{ pos: number, loc: { line: number, column: number } }} AcornError */
-/** @typedef {{ file: string, start: number, end: number, text: string, line: number }} Text */
 
 /** A file that fails both the module and the script parse. */
 export class ParseError extends Error {

@@ -1,12 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
-import { apply } from "../src/apply.js";
-
-/** @typedef {{ file: string, start: number, end: number, text: string, line: number, kind: string, replacement: string }} Rewrite */
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { apply, takenDestination } from "../src/apply.js";
+import { fixture, thrown } from "./support/fixture.js";
 
 const DOM = 'import { util } from "./util.js";\nexport const dom = util;\n';
 const APP =
@@ -29,7 +27,7 @@ const FILES = {
  * @param {string} file
  * @param {string} source
  * @param {[string, number, number, string]} spec text, occurrence, line, replacement
- * @returns {Rewrite}
+ * @returns {import("../src/plan.js").Rewrite}
  */
 function rewrite(file, source, [text, nth, line, replacement]) {
   let start = -1;
@@ -37,8 +35,10 @@ function rewrite(file, source, [text, nth, line, replacement]) {
   return { file, start, end: start + text.length, text, line, kind: "import", replacement };
 }
 
+const DOM_MOVE = { from: "lib/dom.js", to: "lib/core/dom.js" };
 const PLAN = {
-  moves: [{ from: "lib/dom.js", to: "lib/core/dom.js" }],
+  move: DOM_MOVE,
+  moves: [DOM_MOVE],
   rewrites: [
     rewrite("app.js", APP, ["./lib/dom.js", 0, 2, "./lib/core/dom.js"]),
     rewrite("app.js", APP, ["./lib/dom.js", 1, 3, "./lib/core/dom.js"]),
@@ -49,41 +49,12 @@ const PLAN = {
 const TEXTS = { "app.js": APP, "lib/dom.js": DOM };
 
 /**
- * A fresh directory holding `files`, removed when the test ends.
- * @param {import("node:test").TestContext} t
- * @param {Record<string, string>} files
- */
-function fixture(t, files) {
-  const root = mkdtempSync(join(tmpdir(), "jsmover-apply-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  Object.entries(files).forEach(([path, text]) => {
-    mkdirSync(dirname(join(root, path)), { recursive: true });
-    writeFileSync(join(root, path), text);
-  });
-  return root;
-}
-
-/**
  * The text at `path` under `root`, or null when nothing is there.
  * @param {string} root
  * @param {string} path
  */
 function readOr(root, path) {
   return existsSync(join(root, path)) ? readFileSync(join(root, path), "utf8") : null;
-}
-
-/**
- * The error `fn` throws, or undefined when it returns.
- * @param {() => unknown} fn
- * @returns {unknown}
- */
-function thrown(fn) {
-  try {
-    fn();
-  } catch (error) {
-    return error;
-  }
-  return undefined;
 }
 
 /**
@@ -139,10 +110,18 @@ test("an existing destination leaves the importer as written where a free one re
   assert.notEqual(readOr(refused, "app.js"), readOr(free, "app.js"));
 });
 
+test("the taken destination is named where one exists and null where it is free", (t) => {
+  const taken = fixture(t, { ...FILES, "lib/core/dom.js": "export {};\n" });
+  const free = fixture(t, FILES);
+  assert.deepEqual([takenDestination(taken, PLAN), takenDestination(free, PLAN)], ["lib/core/dom.js", null]);
+});
+
 const IMPORTER = 'import { m } from "./m.js";\nexport default m;\n';
 const MODULE = "export const m = 1;\n";
+const M_MOVE = { from: "m.js", to: "lib/m.js" };
 const FAILING_PLAN = {
-  moves: [{ from: "m.js", to: "lib/m.js" }],
+  move: M_MOVE,
+  moves: [M_MOVE],
   rewrites: ["a.js", "b.js"].map((file) => rewrite(file, IMPORTER, ["./m.js", 0, 1, "./lib/m.js"])),
   unresolvable: [],
 };

@@ -1,19 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { main } from "../src/cli.js";
+import { fixture } from "./support/fixture.js";
 
 const IMPORTER = 'import { a } from "./lib/a.js";\nexport const b = a;\n';
 const REWRITTEN = 'import { a } from "./lib/core/a.js";\nexport const b = a;\n';
@@ -33,22 +24,6 @@ const WIDGETS = {
   "widgets/y.js": "export const y = 1;\n",
   "main.js": 'import { x } from "./widgets/x.js";\nexport const z = x;\n',
 };
-
-/**
- * A fresh directory holding `files`, removed when the test ends.
- * @param {import("node:test").TestContext} t
- * @param {Record<string, string>} files
- * @returns {string}
- */
-function fixture(t, files) {
-  const root = mkdtempSync(join(tmpdir(), "jsmover-cli-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  Object.entries(files).forEach(([path, text]) => {
-    mkdirSync(dirname(join(root, path)), { recursive: true });
-    writeFileSync(join(root, path), text);
-  });
-  return root;
-}
 
 /**
  * Run the command in `root`, collecting what it prints.
@@ -199,6 +174,20 @@ test("a directory move carries its files with their internal specifiers as writt
   const root = fixture(t, WIDGETS);
   run(["mv", "widgets", "ui/widgets"], root);
   assert.equal(snapshot(root)["ui/widgets/x.js"], WIDGET_X);
+});
+
+const STYLE = ".widget { color: red; }\n";
+
+test("a directory move carries a stylesheet beside its JavaScript files", (t) => {
+  const root = fixture(t, { ...WIDGETS, "widgets/style.css": STYLE });
+  run(["mv", "widgets", "ui/widgets"], root);
+  assert.equal(snapshot(root)["ui/widgets/style.css"], STYLE);
+});
+
+test("a directory move holding a stylesheet leaves no old directory behind", (t) => {
+  const root = fixture(t, { ...WIDGETS, "widgets/style.css": STYLE });
+  run(["mv", "widgets", "ui/widgets"], root);
+  assert.deepEqual([existsSync(join(root, "widgets")), existsSync(join(root, "ui/widgets"))], [false, true]);
 });
 
 test("a string literal naming the old path is reported at its file and line", (t) => {

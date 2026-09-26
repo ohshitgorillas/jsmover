@@ -1,9 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { scan } from "../src/scan.js";
+import { isSource, scan } from "../src/scan.js";
+import { fixture } from "./support/fixture.js";
 
 /** @type {Record<string, string>} */
 const TREE = {
@@ -19,22 +17,7 @@ const TREE = {
   ".git/hooks/pre-commit.js": "\n",
 };
 
-/**
- * Write a fixture tree into a fresh temporary directory.
- * @param {Record<string, string>} tree relative path to contents
- * @returns {string} the tree's root
- */
-function build(tree) {
-  const root = mkdtempSync(join(tmpdir(), "jsmover-scan-"));
-  for (const [rel, body] of Object.entries(tree)) {
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), body);
-  }
-  return root;
-}
-
-const root = build(TREE);
-after(() => rmSync(root, { recursive: true, force: true }));
+const root = fixture({ after }, TREE);
 
 test("a .js file at the root is found by its relative path", () => {
   assert.ok(scan(root).includes("app.js"));
@@ -45,7 +28,7 @@ test("a file nested two directories deep is found by its root-relative path", ()
 });
 
 test(".mjs and .cjs files are found and other extensions beside them are left out", () => {
-  const lib = scan(root).filter((path) => /^lib\/[a-z]+\.[a-z]+$/.test(path));
+  const lib = scan(root).filter((path) => isSource(path) && /^lib\/[a-z]+\.[a-z]+$/.test(path));
   assert.deepEqual(lib.sort(), ["lib/legacy.cjs", "lib/util.mjs"]);
 });
 

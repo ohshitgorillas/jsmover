@@ -8,7 +8,7 @@ import { planLines, staleLines } from "../src/report.js";
  * @param {number} line line the literal starts on
  * @param {string} text the literal's contents
  * @param {string} kind the site kind
- * @returns {import("../src/jsdoc.js").Site} the site
+ * @returns {import("../src/parse.js").Site} the site
  */
 function site(file, line, text, kind = "import") {
   return { file, start: 10, end: 10 + text.length, text, line, kind };
@@ -20,7 +20,7 @@ function site(file, line, text, kind = "import") {
  * @param {number} line line the literal starts on
  * @param {string} text the specifier before the move
  * @param {string} replacement the specifier after the move
- * @returns {import("../src/jsdoc.js").Site & { replacement: string }} the rewrite
+ * @returns {import("../src/plan.js").Rewrite} the rewrite
  */
 function rewrite(file, line, text, replacement) {
   return { ...site(file, line, text), replacement };

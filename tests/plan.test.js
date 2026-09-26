@@ -3,16 +3,18 @@ import assert from "node:assert/strict";
 import { parse } from "../src/parse.js";
 import { AmbiguousSpecifier } from "../src/resolve.js";
 import { plan } from "../src/plan.js";
+import { isSource } from "../src/scan.js";
 
 /**
- * The plan for `move` over a tree whose files hold `sources`.
+ * The plan for `move` over a tree whose files hold `sources`, parsing only its source files.
  * @param {{ from: string, to: string }} move root-relative source and destination
  * @param {Record<string, string>} sources each file's text, keyed by its root-relative path
  * @returns {import("../src/plan.js").Plan}
  */
 function planFor(move, sources) {
   const files = new Set(Object.keys(sources));
-  const sitesByFile = new Map(Object.entries(sources).map(([file, text]) => [file, parse(file, text)]));
+  const parsed = Object.entries(sources).filter(([file]) => isSource(file));
+  const sitesByFile = new Map(parsed.map(([file, text]) => [file, parse(file, text)]));
   return plan(move, files, sitesByFile);
 }
 
@@ -79,6 +81,19 @@ test("a directory move moves every file beneath it and no file beside it", () =>
       ["components/narrowbar/facettip.js", "components/ui/narrow/facettip.js"],
     ],
   );
+});
+
+test("a directory move keeps the requested move whole beside its per-file moves", () => {
+  assert.deepEqual(planFor(DIR_MOVE, DIR).move, DIR_MOVE);
+});
+
+test("a ./data.json import follows the moved data file", () => {
+  const sources = {
+    "lib/data.json": '{ "n": 1 }\n',
+    "lib/app.js": 'import data from "./data.json";\nexport default data;\n',
+  };
+  const move = { from: "lib/data.json", to: "lib/cfg/data.json" };
+  assert.deepEqual(after(move, sources, "lib/app.js"), ["./cfg/data.json"]);
 });
 
 test("a directory move keeps the specifier between two moved files and rewrites the one leaving the directory", () => {

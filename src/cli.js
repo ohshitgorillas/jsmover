@@ -1,18 +1,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { apply } from "./apply.js";
+import { apply, DestinationExists, takenDestination } from "./apply.js";
 import { parse, ParseError } from "./parse.js";
 import { plan } from "./plan.js";
 import { AmbiguousSpecifier } from "./resolve.js";
-import { planLines, staleLines } from "./report.js";
-import { scan } from "./scan.js";
+import { planLines, staleLines, unresolvableLines } from "./report.js";
+import { isSource, scan } from "./scan.js";
 
 const USAGE = "usage: jsmover mv [--dry-run] <old> <new>\n";
 const DRY_RUN = "--dry-run";
 
 /** @typedef {{ write(chunk: string): unknown }} Out */
-/** @typedef {import("./apply.js").Plan} Plan */
-/** @typedef {{ file: string, start: number, end: number, text: string, line: number }} Text */
 /** @typedef {{ from: string, to: string, dryRun: boolean }} Command */
 
 /**
@@ -49,31 +47,35 @@ function print(out, lines) {
 }
 
 /**
- * Read and parse every scanned file under `root`, then plan the move. Nothing
- * is written.
+ * Read and parse every source file under `root`, plan the move and check its
+ * destination. Nothing is written.
  * @param {string} root
- * @param {{ from: string, to: string }} move
- * @returns {{ texts: Record<string, string>, strings: Text[], comments: Text[], plan: Plan }}
+ * @param {import("./plan.js").Move} move
+ * @returns {{ texts: Record<string, string>, strings: import("./parse.js").Text[], comments: import("./parse.js").Text[], plan: import("./plan.js").Plan }}
  * @throws {ParseError} when a file fails to parse
  * @throws {AmbiguousSpecifier} when a specifier matches more than one file
+ * @throws {DestinationExists} when the destination exists
  */
 function prepare(root, move) {
   const files = scan(root);
   /** @type {Record<string, string>} */
   const texts = {};
-  /** @type {Text[]} */
+  /** @type {import("./parse.js").Text[]} */
   const strings = [];
-  /** @type {Text[]} */
+  /** @type {import("./parse.js").Text[]} */
   const comments = [];
   const sitesByFile = new Map();
-  for (const file of files) {
+  for (const file of files.filter(isSource)) {
     texts[file] = readFileSync(path.join(root, file), "utf8");
     const parsed = parse(file, texts[file]);
     sitesByFile.set(file, parsed);
     strings.push(...parsed.strings);
     comments.push(...parsed.comments);
   }
-  return { texts, strings, comments, plan: plan(move, new Set(files), sitesByFile) };
+  const planned = plan(move, new Set(files), sitesByFile);
+  const taken = takenDestination(root, planned);
+  if (taken !== null) throw new DestinationExists(taken);
+  return { texts, strings, comments, plan: planned };
 }
 
 /**
@@ -83,7 +85,9 @@ function prepare(root, move) {
  * @returns {string}
  */
 function refusal(error) {
-  if (error instanceof ParseError || error instanceof AmbiguousSpecifier) return error.message;
+  if (error instanceof ParseError || error instanceof AmbiguousSpecifier || error instanceof DestinationExists) {
+    return error.message;
+  }
   throw error;
 }
 
@@ -104,10 +108,6 @@ export function main(argv, stdout, stderr, cwd) {
     stderr.write(USAGE);
     return 2;
   }
-  if (existsSync(path.join(cwd, cmd.to))) {
-    print(stderr, [`destination exists: ${cmd.to}`]);
-    return 1;
-  }
   const move = { from: cmd.from, to: cmd.to };
   let prepared;
   try {
@@ -126,6 +126,6 @@ export function main(argv, stdout, stderr, cwd) {
     }
   }
   print(stderr, staleLines(move, prepared.strings, prepared.comments));
-  print(stderr, planLines({ moves: [], rewrites: [], unresolvable: prepared.plan.unresolvable }));
+  print(stderr, unresolvableLines(prepared.plan.unresolvable));
   return 0;
 }

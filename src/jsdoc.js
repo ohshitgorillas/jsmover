@@ -1,5 +1,3 @@
-/** @typedef {{ file: string, start: number, end: number, text: string, line: number, kind: string }} Site */
-
 // One alternative per quote, so each literal's contents stop at its own closing
 // quote and a line break ends an unterminated one.
 const REFERENCE = /import\(\s*(?:"([^"\n]*)"|'([^'\n]*)')\s*\)/g;
@@ -22,10 +20,10 @@ function lineAt(text, offset) {
  * @param {string} file root-relative path of the file
  * @param {{ start: number, end: number }[]} comments comment ranges in `text`
  * @param {string} text the file's text
- * @returns {Site[]} one site per string-literal reference, in source order
+ * @returns {import("./parse.js").Site[]} one site per string-literal reference, in source order
  */
 export function jsdocSites(file, comments, text) {
-  /** @type {Site[]} */
+  /** @type {import("./parse.js").Site[]} */
   const sites = [];
   for (const comment of comments) {
     const body = text.slice(comment.start, comment.end);

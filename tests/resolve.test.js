@@ -6,7 +6,7 @@ import { AmbiguousSpecifier, resolve } from "../src/resolve.js";
  * A specifier site in `file` whose literal holds `text`.
  * @param {string} file root-relative path of the importing file
  * @param {string} text the specifier
- * @returns {import("../src/resolve.js").Site} the site
+ * @returns {import("../src/parse.js").Site} the site
  */
 function site(file, text) {
   return { file, start: 8, end: 8 + text.length, text, line: 1, kind: "import" };

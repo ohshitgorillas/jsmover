@@ -1,10 +1,8 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { fixture } from "./support/fixture.js";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/resolve-check.mjs", import.meta.url));
 
@@ -26,27 +24,11 @@ const PLANTED = [
 
 const CODE_MISSES = ["./missing-dynamic.js", "./missing-export.js", "./missing-require.cjs", "./missing-static.js"];
 
-/**
- * A fresh directory holding `files`, keyed by relative path.
- * @param {Record<string, string>} files
- * @returns {string}
- */
-function tree(files) {
-  const root = mkdtempSync(join(tmpdir(), "resolve-check-"));
-  for (const [rel, text] of Object.entries(files)) {
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), text);
-  }
-  return root;
-}
-
-const planted = tree({ "a.js": PLANTED + "\n", "ok.js": "export const ok = 1;\n" });
-const clean = tree({ "b.js": 'import { ok } from "./lib/ok.js";\n', "lib/ok.js": "export const ok = 1;\n" });
-
-after(() => {
-  rmSync(planted, { recursive: true, force: true });
-  rmSync(clean, { recursive: true, force: true });
-});
+const planted = fixture({ after }, { "a.js": PLANTED + "\n", "ok.js": "export const ok = 1;\n" });
+const clean = fixture(
+  { after },
+  { "b.js": 'import { ok } from "./lib/ok.js";\n', "lib/ok.js": "export const ok = 1;\n" },
+);
 
 /**
  * Run the oracle and split its stdout into lines.
