@@ -149,3 +149,27 @@ test("a non-strict script's syntax error is reported at its own line and column"
   const error = failure("s.cjs", src);
   assert.deepEqual([error?.line, error?.column], [3, "var c = ".length]);
 });
+
+test("strings holds every string literal that is not a specifier site, with its line", () => {
+  const src = 'import a from "./a.js";\nconst label = "lib/a.js";\nrequire("./b.cjs");\nlog(\'./c.js\', 3);\n';
+  const { strings } = parse("s.js", src);
+  assert.deepEqual(
+    strings?.map((record) => [record.text, record.line]),
+    [
+      ["lib/a.js", 2],
+      ["./c.js", 4],
+    ],
+  );
+});
+
+test("comments holds every comment's body, with its line", () => {
+  const src = "// line body\nlet x;\n/* block\n body */\nimport './y.js';\n";
+  const { comments } = parse("c.js", src);
+  assert.deepEqual(
+    comments?.map((record) => [record.text, record.line]),
+    [
+      [" line body", 1],
+      [" block\n body ", 3],
+    ],
+  );
+});
