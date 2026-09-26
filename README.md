@@ -8,7 +8,7 @@
 jsmover mv <old> <new> [--dry-run]
 ```
 
-`<old>` and `<new>` are paths relative to the current directory, which is the root of the tree jsmover scans and edits. Every `.js`, `.mjs` and `.cjs` file under it is parsed before any write; no configuration file is read.
+`<old>` and `<new>` are paths relative to the current directory, which is the root of the tree jsmover scans and edits. Every `.js`, `.mjs` and `.cjs` file under it is parsed before any write; no configuration file is read. Inside a git work tree the files are those `git ls-files` lists, tracked or untracked but not ignored, so ignored directories and nested worktrees are left out; outside one, every file is taken except those under `node_modules` or `.git`.
 
 - The plan goes to stdout: one `move: <old> -> <new>` line per moved file, then one `path:line: old -> new` line per rewritten specifier.
 - `--dry-run` prints the same plan and touches nothing.

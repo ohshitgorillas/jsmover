@@ -1,5 +1,6 @@
-import { readdirSync } from "node:fs";
+import { lstatSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
+import { isWorkTree, listedFiles } from "./git.js";
 
 const SKIPPED = new Set(["node_modules", ".git"]);
 const SOURCE = /\.(?:js|mjs|cjs)$/;
@@ -14,12 +15,12 @@ export function isSource(file) {
 }
 
 /**
- * List every file under a tree, leaving out anything beneath a `node_modules`
- * or `.git` directory.
+ * Every file under a tree outside a git work tree, leaving out anything
+ * beneath a `node_modules` or `.git` directory.
  * @param {string} root directory to walk
- * @returns {string[]} root-relative paths with `/` separators, sorted
+ * @returns {string[]} root-relative paths with `/` separators
  */
-export function scan(root) {
+function walk(root) {
   /** @type {string[]} */
   const found = [];
   /** @type {string[]} */
@@ -34,5 +35,28 @@ export function scan(root) {
       }
     }
   }
-  return found.sort();
+  return found;
+}
+
+/**
+ * Whether `path` under `root` is a regular file on disk.
+ * @param {string} root
+ * @param {string} path
+ * @returns {boolean}
+ */
+function isFileOnDisk(root, path) {
+  return lstatSync(join(root, path), { throwIfNoEntry: false })?.isFile() ?? false;
+}
+
+/**
+ * List every file under a tree. Inside a git work tree that is each file git
+ * tracks or would track, present on disk; elsewhere it is every file outside
+ * a `node_modules` or `.git` directory.
+ * @param {string} root directory to list
+ * @returns {string[]} root-relative paths with `/` separators, sorted
+ */
+export function scan(root) {
+  if (!isWorkTree(root)) return walk(root).sort();
+  const listed = new Set(listedFiles(root));
+  return [...listed].filter((path) => isFileOnDisk(root, path)).sort();
 }

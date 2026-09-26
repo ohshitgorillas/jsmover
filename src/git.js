@@ -12,13 +12,34 @@ function git(root, args) {
 }
 
 /**
+ * Whether `root` is inside a git work tree.
+ * @param {string} root
+ * @returns {boolean}
+ */
+export function isWorkTree(root) {
+  return git(root, ["rev-parse", "--is-inside-work-tree"]).status === 0;
+}
+
+/**
+ * The paths git lists under `root`: tracked files, including any deleted from
+ * disk, and untracked files that no ignore rule matches. A nested repository or
+ * worktree is listed as its directory, not its contents.
+ * @param {string} root directory inside a work tree
+ * @returns {string[]} paths relative to `root`, with `/` separators
+ */
+export function listedFiles(root) {
+  const { stdout } = git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+  return stdout.split("\0").filter((path) => path !== "");
+}
+
+/**
  * Whether `path` is tracked by git in the work tree at `root`.
  * @param {string} root directory git runs in
  * @param {string} path the path to look up, relative to `root` or absolute
  * @returns {boolean} true when `root` is inside a work tree and git tracks `path`
  */
 export function isTracked(root, path) {
-  if (git(root, ["rev-parse", "--is-inside-work-tree"]).status !== 0) return false;
+  if (!isWorkTree(root)) return false;
   return git(root, ["ls-files", "--error-unmatch", "--", path]).status === 0;
 }
 
